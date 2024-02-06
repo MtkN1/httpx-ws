@@ -105,9 +105,10 @@ class WebSocketSession:
             float
         ] = DEFAULT_KEEPALIVE_PING_TIMEOUT_SECONDS,
         subprotocol: typing.Optional[str] = None,
+        trailing_data: bytes = b"",
     ) -> None:
         self.stream = stream
-        self.connection = wsproto.connection.Connection(wsproto.ConnectionType.CLIENT)
+        self.connection = wsproto.connection.Connection(wsproto.ConnectionType.CLIENT, trailing_data=trailing_data)
         self.subprotocol = subprotocol
 
         self._events: queue.Queue[
@@ -1054,6 +1055,15 @@ def _connect_ws(
         if response.status_code != 101:
             raise WebSocketUpgradeError(response)
 
+        (
+            trailing_data,
+            _,
+        ) = (
+            response.stream._stream._httpcore_stream._status.connection._connection._h11_state.trailing_data
+        )
+        if trailing_data:
+            print("trailing_data:", trailing_data)
+
         subprotocol = response.headers.get("sec-websocket-protocol")
 
         session = WebSocketSession(
@@ -1063,6 +1073,7 @@ def _connect_ws(
             keepalive_ping_interval_seconds=keepalive_ping_interval_seconds,
             keepalive_ping_timeout_seconds=keepalive_ping_timeout_seconds,
             subprotocol=subprotocol,
+            trailing_data=trailing_data,
         )
         yield session
         session.close()
@@ -1190,6 +1201,15 @@ async def _aconnect_ws(
         if response.status_code != 101:
             raise WebSocketUpgradeError(response)
 
+        (
+            trailing_data,
+            _,
+        ) = (
+            response.stream._stream._httpcore_stream._status.connection._connection._h11_state.trailing_data
+        )
+        if trailing_data:
+            print("trailing_data:", trailing_data)
+
         subprotocol = response.headers.get("sec-websocket-protocol")
 
         session = AsyncWebSocketSession(
@@ -1199,6 +1219,7 @@ async def _aconnect_ws(
             keepalive_ping_interval_seconds=keepalive_ping_interval_seconds,
             keepalive_ping_timeout_seconds=keepalive_ping_timeout_seconds,
             subprotocol=subprotocol,
+            trailing_data=trailing_data,
         )
         yield session
         await session.close()
